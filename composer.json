@@ -1,0 +1,30 @@
+{
+    "name": "rendezvous/rendezvous",
+    "description": "Laravel Liviwire appointment package",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Rendezvous\\Rendezvous\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel" : {
+            "providers": [
+               "Rendezvous\\Rendezvous\\RendezvousServiceProvider",
+               "Rendezvous\\Rendezvous\\Rendezvous2ServiceProvider"
+            ] 
+        }
+    },
+    "authors": [
+        {
+            "name": "yaziddouassi",
+            "email": "rabahdouassi@yahoo.fr"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+         "php": "^8.0"
+    }
+}
