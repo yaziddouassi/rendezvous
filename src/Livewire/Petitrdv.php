@@ -12,6 +12,8 @@ use Rendezvous\Rendezvous\Models\RendezvousJouractif ;
 use App\Models\User ;
 use Carbon\Carbon ;
 use Auth ;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class Petitrdv extends Component
 {
@@ -31,79 +33,84 @@ class Petitrdv extends Component
 
 
     public function valider($a)
-    {
-      
+{
+    $date = Carbon::yesterday();
+    $yesterday = Carbon::create($date->year, $date->month, $date->day, 23, 59, 59, 'Europe/Paris');
 
-        
-        $date = Carbon::yesterday();
+    $userId = Auth::id();
 
-        $yesterday = Carbon::create( $date->year,$date->month,$date->day,23,59,59,'Europe/Paris') ;
+    DB::beginTransaction();
 
-        $count = RendezvousHoraire::where('userid',Auth::user()->id)
-                          ->where('ladate','>',$yesterday)
-                         ->count() ;
-   
-                         
-            if($count != 0) {
+    try {
+        // Check if the user already has a future rendezvous
+        $count = RendezvousHoraire::where('userid', $userId)
+            ->where('ladate', '>', $yesterday)
+            ->count();
 
-                $this->js("
+        if ($count > 0) {
+            DB::rollBack();
+            $this->js("
                 Swal.fire({
-                  title: 'Attention!',
-                  text: 'Vous déja un rendez-vous',
-                  icon: 'error',
-                  confirmButtonText: 'valider'
-                                })
-                            ");          
-                $this->charger() ;
-                            }
-                
-            if($count == 0) {
-                    
-                            
-                            $horaire = RendezvousHoraire::where('id',$a)
-                                                ->where('userid','=',0)
-                                                ->first() ;
-                
-                            if($horaire) {
-                
-                                $horaire->userid = Auth::user()->id ;
-                                $horaire->usernom = Auth::user()->name ;
-                                $horaire->usermail = Auth::user()->email ;
-                                $horaire->save();
-                
-                                $this->js("
-                                  Swal.fire({
-                                    title: 'Bravo!',
-                                    text: 'le rendez-vous a été pris',
-                                    icon: 'success',
-                                    confirmButtonText: 'valider'
-                                })
-                            ");
-                                
-                                $this->initier() ;
-                                $this->charger() ;
-                            }
-                
-                            elseif(!$horaire) {
-                
-                                $this->js("
-                                Swal.fire({
-                                  title: 'Attention!',
-                                  text: 'le rendez-vous n est plus disponible !',
-                                  icon: 'error',
-                                  confirmButtonText: 'valider'
-                                                })
-                                            ");
+                    title: 'Attention!',
+                    text: 'Vous avez déjà un rendez-vous',
+                    icon: 'error',
+                    confirmButtonText: 'valider'
+                })
+            ");
+            $this->charger();
+            return;
+        }
 
-                                $this->charger() ;
-                            }
-                
-                         }
-                
+        // Retrieve the rendezvous slot using lockForUpdate
+        $horaire = RendezvousHoraire::where('id', $a)
+            ->where('userid', 0)
+            ->lockForUpdate()
+            ->first();
 
+        if ($horaire) {
+            // Assign the rendezvous to the current user
+            $horaire->userid = $userId;
+            $horaire->usernom = Auth::user()->name;
+            $horaire->usermail = Auth::user()->email;
+            $horaire->save();
 
+            DB::commit(); // Commit transaction
 
+            $this->js("
+                Swal.fire({
+                    title: 'Bravo!',
+                    text: 'Le rendez-vous a été pris',
+                    icon: 'success',
+                    confirmButtonText: 'valider'
+                })
+            ");
+            
+            $this->initier();
+            $this->charger();
+        } else {
+            DB::rollBack();
+            $this->js("
+                Swal.fire({
+                    title: 'Attention!',
+                    text: 'Le rendez-vous n'est plus disponible!',
+                    icon: 'error',
+                    confirmButtonText: 'valider'
+                })
+            ");
+            $this->charger();
+        }
+    } catch (\Exception $e) {
+        DB::rollBack();
+        $this->js("
+            Swal.fire({
+                title: 'Erreur!',
+                text: 'Une erreur est survenue. Veuillez réessayer!',
+                icon: 'error',
+                confirmButtonText: 'valider'
+            })
+        ");
     }
+}
 
 
 

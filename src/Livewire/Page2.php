@@ -19,7 +19,8 @@ use Rendezvous\Rendezvous\Models\RendezvousHoraire ;
 use Rendezvous\Rendezvous\Models\RendezvousJouractif ;
 use Livewire\Attributes\On;
 use Illuminate\Database\Eloquent\Collection;
-
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 
 
@@ -150,210 +151,247 @@ class Page2 extends Component
 
 
       public function ajouter1($a, $b) {
-  
-  
-        if($a != '') {
-           
-           $user = User::find($a) ;
-
-           $heureajoute = RendezvousHoraire::find($b);
-
-           if($user) {
-
-                  if($heureajoute) {
-
-                        if($heureajoute->userid == 0) {
-
-                           $heureajoute->userid = $user->id ;
-                           $heureajoute->usernom = $user->name ;
-                           $heureajoute->usermail = $user->email ;
-                           $heureajoute->save();
-                         
-                           $this->js("
-                               Swal.fire({
-                                 title: 'Bravo!',
-                                 text: 'le rendez-vous a été ajoutée',
-                                 icon: 'success',
-                                confirmButtonText: 'valider'
-                               })
-                           ");
-                         
-                           $this->initier1();
-                           $this->initier2();
-                        }
-
-
-                        elseif($heureajoute->userid != 0) {
-
-                          $this->js("
-                               Swal.fire({
-                                 title: 'Attention!',
-                                 text: 'il y a deja un rendez-vous!',
-                                 icon: 'errror',
-                                confirmButtonText: 'valider'
-                               })
-                           ");
-
-                           $this->initier1();
-                           $this->initier2();
-
-                        }
-
-                  }
-           }
-
-
-            
-
+        if (empty($a)) {
+            return;
         }
+    
+        DB::transaction(function () use ($a, $b) {
+            $user = User::find($a);
+    
+            if (!$user) {
+                $this->js("
+                    Swal.fire({
+                        title: 'Erreur!',
+                        text: 'Utilisateur introuvable.',
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    });
+                ");
+                return;
+            }
+    
+            // Verrouille la ligne pour éviter une double réservation
+            $heureajoute = RendezvousHoraire::where('id', $b)->lockForUpdate()->first();
+    
+            if (!$heureajoute) {
+                $this->js("
+                    Swal.fire({
+                        title: 'Erreur!',
+                        text: 'Ce créneau n'existe pas.',
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    });
+                ");
+                return;
+            }
+    
+            if ($heureajoute->userid == 0) {
+                // Mise à jour de la réservation
+                $heureajoute->userid = $user->id;
+                $heureajoute->usernom = $user->name;
+                $heureajoute->usermail = $user->email;
+                $heureajoute->save();
+    
+                $this->js("
+                    Swal.fire({
+                        title: 'Bravo!',
+                        text: 'Le rendez-vous a été ajouté avec succès.',
+                        icon: 'success',
+                        confirmButtonText: 'OK'
+                    });
+                ");
+    
+                $this->initier1();
+                $this->initier2();
+            } else {
+                // Le créneau est déjà réservé
+                $this->js("
+                    Swal.fire({
+                        title: 'Attention!',
+                        text: 'Ce créneau est déjà pris.',
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    });
+                ");
+            }
+        });
+    } 
 
-    }
+    
+    public function ajouter2($a, $b)
+{
+    DB::beginTransaction();
 
+    try {
+        $user = User::where('email', $a)->first();
 
-    public function ajouter2($a,$b) {
-
-         $user = User::where('email',$a)->first();
-         if(!$user) {
-           return
-           $this->js("
-                               Swal.fire({
-                                 title: 'Attention!',
-                                 text: 'cette adresse mail nexiste pas!',
-                                 icon: 'errror',
-                                confirmButtonText: 'valider'
-                               })
-                           ");
-
-         }
-
-         $heureajoute = RendezvousHoraire::find($b);
-
-         if($heureajoute) {
-
-           if($heureajoute->userid == 0) {
-
-              $heureajoute->userid = $user->id ;
-              $heureajoute->usernom = $user->name ;
-              $heureajoute->usermail = $user->email ;
-              $heureajoute->save();
-            
-              $this->js("
-                  Swal.fire({
-                    title: 'Bravo!',
-                    text: 'le rendez-vous a été ajoutée',
-                    icon: 'success',
-                   confirmButtonText: 'valider'
-                  })
-              ");
-            
-              $this->initier1();
-              $this->initier2();
-           }
-
-
-           elseif($heureajoute->userid != 0) {
-
-             $this->js("
-                  Swal.fire({
+        if (!$user) {
+            return $this->js("
+                Swal.fire({
                     title: 'Attention!',
-                    text: 'il y a deja un rendez-vous!',
-                    icon: 'errror',
-                   confirmButtonText: 'valider'
-                  })
-              ");
-
-              $this->initier1();
-              $this->initier2();
-
-           }
-
-     }
-
-    }
-
-
-
-    public function modifier1($a, $b) {
-
-
-      if($a != '') {
-
-        $user = User::find($a) ;
-
-        $heureajoute = RendezvousHoraire::find($b);
-
-        
-        if($user) {
-
-             if($heureajoute) {
-
-              $heureajoute->userid = $user->id ;
-              $heureajoute->usernom = $user->name ;
-              $heureajoute->usermail = $user->email ;
-              $heureajoute->save();
-            
-              $this->js("
-                               Swal.fire({
-                                 title: 'Bravo!',
-                                 text: 'le rendez-vous a été ajoutée2',
-                                 icon: 'success',
-                                confirmButtonText: 'valider'
-                               })
-                           ");
-            
-              $this->initier1();
-              $this->initier2();
-             }
+                    text: 'Cette adresse mail n'existe pas!',
+                    icon: 'error',
+                    confirmButtonText: 'Valider'
+                })
+            ");
         }
 
+        $heureajoute = RendezvousHoraire::where('id', $b)->lockForUpdate()->first();
 
-       
-       }
+        if ($heureajoute) {
+            if ($heureajoute->userid == 0) {
+                $heureajoute->userid = $user->id;
+                $heureajoute->usernom = $user->name;
+                $heureajoute->usermail = $user->email;
+                $heureajoute->save();
 
-  }
+                DB::commit();
 
+                $this->js("
+                    Swal.fire({
+                        title: 'Bravo!',
+                        text: 'Le rendez-vous a été ajouté',
+                        icon: 'success',
+                        confirmButtonText: 'Valider'
+                    })
+                ");
 
-  public function modifier2($a, $b) {
+                $this->initier1();
+                $this->initier2();
+            } elseif ($heureajoute->userid != 0) {
+                DB::rollBack();
 
-    $user = User::where('email',$a)->first();
-     if(!$user) {
-        return
+                $this->js("
+                    Swal.fire({
+                        title: 'Attention!',
+                        text: 'Il y a déjà un rendez-vous!',
+                        icon: 'error',
+                        confirmButtonText: 'Valider'
+                    })
+                ");
+
+                $this->initier1();
+                $this->initier2();
+            }
+        } else {
+            DB::rollBack();
+
+            $this->js("
+                Swal.fire({
+                    title: 'Erreur!',
+                    text: 'Heure de rendez-vous non trouvée!',
+                    icon: 'error',
+                    confirmButtonText: 'Valider'
+                })
+            ");
+        }
+    } catch (\Exception $e) {
+        DB::rollBack();
+
         $this->js("
-        Swal.fire({
-          title: 'Attention!',
-          text: 'cette adresse mail nexiste pas!',
-          icon: 'errror',
-         confirmButtonText: 'valider'
-        })
-    ");
-     }
-
-     $heureajoute = RendezvousHoraire::find($b);
-
-     if($heureajoute) {
-
-       $heureajoute->userid = $user->id ;
-       $heureajoute->usernom = $user->name ;
-       $heureajoute->usermail = $user->email ;
-       $heureajoute->save();
-     
-       $this->js("
-                        Swal.fire({
-                          title: 'Bravo!',
-                          text: 'le rendez-vous a été ajoutée2',
-                          icon: 'success',
-                         confirmButtonText: 'valider'
-                        })
-                    ");
-     
-       $this->initier1();
-       $this->initier2();
-      }
+            Swal.fire({
+                title: 'Erreur!',
+                text: 'Une erreur est survenue, veuillez réessayer.',
+                icon: 'error',
+                confirmButtonText: 'Valider'
+            })
+        ");
+    }
+}
 
 
-  }
+
+public function modifier1($a, $b) {
+    if (empty($a) || empty($b)) {
+        return; // Prevent unnecessary queries if inputs are empty
+    }
+
+    DB::beginTransaction();
+    
+    try {
+        // Lock the user record to prevent race conditions
+        $user = User::find($a);
+
+        if (!$user) {
+            DB::rollBack();
+            return; // Exit if user is not found
+        }
+
+        // Lock the rendezvousHoraire record for update
+        $heureajoute = RendezvousHoraire::where('id', $b)->lockForUpdate()->first();
+
+        if (!$heureajoute) {
+            DB::rollBack();
+            return; // Exit if the record is not found
+        }
+
+        // Update the rendezvousHoraire record
+        $heureajoute->userid = $user->id;
+        $heureajoute->usernom = $user->name;
+        $heureajoute->usermail = $user->email;
+        $heureajoute->save();
+
+        DB::commit(); // Commit the transaction only if everything succeeds
+
+        // Show success message using SweetAlert
+        $this->js("
+            Swal.fire({
+                title: 'Bravo!',
+                text: 'Le rendez-vous a été ajouté avec succès',
+                icon: 'success',
+                confirmButtonText: 'Valider'
+            })
+        ");
+
+        // Call the necessary initialization methods
+        $this->initier1();
+        $this->initier2();
+
+    } catch (\Exception $e) {
+        DB::rollBack(); // Rollback the transaction if any error occurs
+        report($e); // Log the error for debugging
+    }
+}
 
 
+public function modifier2($a, $b)
+{
+    DB::transaction(function () use ($a, $b) {
+        $user = User::where('email', $a)->lockForUpdate()->first();
+
+        if (!$user) {
+            return $this->js("
+                Swal.fire({
+                  title: 'Attention!',
+                  text: 'Cette adresse mail n\'existe pas!',
+                  icon: 'error',
+                  confirmButtonText: 'Valider'
+                })
+            ");
+        }
+
+        $heureajoute = RendezvousHoraire::lockForUpdate()->find($b);
+
+        if ($heureajoute) {
+            $heureajoute->userid = $user->id;
+            $heureajoute->usernom = $user->name;
+            $heureajoute->usermail = $user->email;
+            $heureajoute->save();
+
+            $this->js("
+                Swal.fire({
+                  title: 'Bravo!',
+                  text: 'Le rendez-vous a été ajouté avec succès',
+                  icon: 'success',
+                  confirmButtonText: 'Valider'
+                })
+            ");
+
+            $this->initier1();
+            $this->initier2();
+        }
+    });
+}
 
   public function supprimer($a) {
 
